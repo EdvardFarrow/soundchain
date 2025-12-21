@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: soundchain_pg
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - ./.docker-data/postgres:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23-alpine
+    container_name: soundchain_ch
+    ports:
+      - "${CLICKHOUSE_PORT}:8123"  # HTTP interface
+      - "9000:9000"                # Native interface
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - ./.docker-data/clickhouse:/var/lib/clickhouse
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G  
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:latest
+    container_name: soundchain_redpanda
+    command:
+      - redpanda start
+      - --smp 1  
+      - --memory 1G 
+      - --reserve-memory 0M
+      - --overprovisioned
+      - --node-id 0
+      - --check=false
+      # 9092 (inner) и 19092 (outer)
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092" # Kafka API 
+      - "9644:9644"   # Admin API
+    volumes:
+      - ./.docker-data/redpanda:/var/lib/redpanda/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1.2G
+
+  redis:
+    image: redis:alpine
+    container_name: soundchain_redis
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - ./.docker-data/redis:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+networks:
+  default:
+    name: soundchain_net
