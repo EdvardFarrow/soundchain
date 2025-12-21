@@ -36,11 +36,15 @@ check-infra: ps
 # Dependencies
 install:
 	uv sync
+	uv run ./manage.py collectstatic --noinput
+
+static:
+	uv run ./manage.py collectstatic --noinput
 
 # Development
 run:
-	# Listens on 0.0.0.0 to allow external access (e.g. from other containers)
-	uv run ./manage.py runserver 0.0.0.0:8000
+	@mkdir -p staticfiles
+	PYTHONPATH=src uv run uvicorn soundchain.asgi:app --host 0.0.0.0 --port 8000 --reload --reload-dir src
 
 migrations:
 	uv run ./manage.py makemigrations
@@ -54,8 +58,8 @@ superuser:
 # Quality Control
 lint:
 	# Check style (ruff) and types (mypy)
-	uv run ruff check .
-	uv run mypy src
+	PYTHONPATH=src uv run ruff check .
+	PYTHONPATH=src uv run mypy src
 
 format:
 	# Auto-fix imports and format code

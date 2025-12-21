@@ -1,5 +1,7 @@
 from pathlib import Path
 from decouple import config, Csv 
+from soundchain.utils.logging import setup_logging
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -7,6 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 SECRET_KEY = config("DJANGO_SECRET_KEY", default="insecure-dev-key-change-me")
 
 DEBUG = config("DJANGO_DEBUG", default=True, cast=bool)
+
+LOGGING = setup_logging(debug=DEBUG)
 
 ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", default="127.0.0.1,localhost", cast=Csv())
 
