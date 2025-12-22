@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = config("DJANGO_SECRET_KEY", default="insecure-dev-key-change-me")
 
-DEBUG = config("DJANGO_DEBUG", default=True, cast=bool)
+DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 
 LOGGING = setup_logging(debug=DEBUG)
 
@@ -21,7 +21,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "soundchain.django_apps"
+    "soundchain.django_apps",
+    "soundchain.django_apps.ledger.apps.LedgerConfig"
 ]
 
 MIDDLEWARE = [

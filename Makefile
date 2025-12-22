@@ -69,3 +69,15 @@ format:
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf .mypy_cache .ruff_cache
+
+init-db:
+	# Init clickhouse tables
+	PYTHONPATH=src uv run src/soundchain/domains/analytics/init_db.py
+
+worker:
+	# ETL workers (Redpanda -> ClickHouse)
+	PYTHONPATH=src uv run src/soundchain/domains/ingestion/worker.py
+
+payout:
+	# Calculation of payments (ClickHouse -> Ledger/Postgres)
+	PYTHONPATH=src uv run src/soundchain/domains/ledger/payout.py

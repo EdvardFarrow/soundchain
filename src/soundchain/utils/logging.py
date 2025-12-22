@@ -18,11 +18,6 @@ def setup_logging(debug: bool = False) -> Dict[str, Any]:
         structlog.processors.format_exc_info,     
     ]
 
-    if debug:
-        renderer = structlog.dev.ConsoleRenderer()
-    else:
-        renderer = structlog.processors.JSONRenderer(serializer=orjson.dumps)
-
     structlog.configure(
         processors=[
             *shared_processors,
@@ -32,14 +27,22 @@ def setup_logging(debug: bool = False) -> Dict[str, Any]:
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
-
+    
+    if debug:
+        formatter_processor = structlog.dev.ConsoleRenderer()
+    else:
+        formatter_processor = structlog.processors.JSONRenderer(
+            serializer=lambda o, **kw: orjson.dumps(o, default=str).decode()
+        )
+        
+        
     config = {
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
             "json_formatter": {
                 "()": structlog.stdlib.ProcessorFormatter,
-                "processor": renderer,
+                "processor": formatter_processor,
                 "foreign_pre_chain": shared_processors,
             },
         },
@@ -57,7 +60,7 @@ def setup_logging(debug: bool = False) -> Dict[str, Any]:
         "loggers": {
             "django": {"handlers": ["console"], "level": "INFO", "propagate": False},
             "uvicorn": {"handlers": ["console"], "level": "INFO", "propagate": False},
-            "uvicorn.access": {"handlers": ["console"], "level": "INFO", "propagate": False},
+            "uvicorn.access": {"handlers": ["console"], "level": "WARNING", "propagate": False},
             "uvicorn.error": {"handlers": ["console"], "level": "INFO", "propagate": False},
             "aiokafka": {"handlers": ["console"], "level": "WARNING", "propagate": False},
         }
