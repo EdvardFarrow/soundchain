@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package ingestion;
+
+service SoundChainIngestion {
+  rpc SendListen (ListenRequest) returns (ListenResponse);
+}
+
+message ListenRequest {
+  string event_id = 1;
+  string user_id = 2;
+  string track_id = 3;
+  int32 duration_played_ms = 4;
+  string country = 5;
+  string platform = 6;
+  string timestamp = 7;
+}
+
+message ListenResponse {
+  bool success = 1;
+  string message = 2;
+}

@@ -81,3 +81,15 @@ worker:
 payout:
 	# Calculation of payments (ClickHouse -> Ledger/Postgres)
 	PYTHONPATH=src uv run src/soundchain/domains/ledger/payout.py
+
+rest-load:
+	# Load via REST
+	PYTHONPATH=src uv run src/soundchain/scripts/rest_load_generator.py
+
+grpc-run:
+	# Run gRPC server (Port 50051)
+	PYTHONPATH=src uv run src/soundchain/grpc_server.py
+
+grpc-load:
+	# Load via gRPC (Protobuf)
+	PYTHONPATH=src uv run src/soundchain/scripts/grpc_load_generator.py
