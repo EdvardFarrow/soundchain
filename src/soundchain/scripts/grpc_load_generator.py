@@ -30,13 +30,14 @@ def pre_generate_pool(size: int = 5000) -> list:
     Generates a pool of Protobuf requests to avoid CPU overhead during the test.
     """
     pool = []
+    user_ids = [str(uuid.uuid4()) for _ in range(1000)]
     platforms = ["ios", "android", "web", "smart_speaker"]
     countries = ["US", "GB", "DE", "FR", "RU", "JP", "BR"]
 
     for _ in range(size):
         req = ingestion_pb2.ListenRequest(
             event_id=str(uuid.uuid4()),
-            user_id=f"user_{random.randint(1, 50000)}",
+            user_id=random.choice(user_ids),
             track_id=str(uuid.uuid4()),
             duration_played_ms=random.randint(30000, 300000),
             country=random.choice(countries),
