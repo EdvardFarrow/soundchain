@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 3s 
+
+scrape_configs:
+  - job_name: 'soundchain_worker'
+    static_configs:
+      - targets: ['worker:8000'] 

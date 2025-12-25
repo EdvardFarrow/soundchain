@@ -9,6 +9,7 @@ from decouple import config
 from soundchain.utils.logging import setup_logging
 from soundchain.settings import DEBUG
 import logging.config
+from prometheus_client import start_http_server, Counter
 
 
 logging.config.dictConfig(setup_logging(debug=DEBUG))
@@ -26,6 +27,12 @@ MAX_RETRIES = 5
 INITIAL_BACKOFF = 1.0
 MULTIPLIER_BACKOFF = 2.0
 DLQ_TOPIC = "raw-listens-dlq"
+
+
+# Counters
+PROCESSED_MESSAGES = Counter('soundchain_processed_messages_total', 'Total messages successfully inserted into ClickHouse')
+PROCESSING_ERRORS = Counter('soundchain_processing_errors_total', 'Total errors during parsing or insertion')
+DLQ_MESSAGES = Counter('soundchain_dlq_messages_total', 'Total messages sent to DLQ')
 
 
 class ClickHouseLoader:
@@ -96,6 +103,9 @@ async def send_to_dlq(producer: AIOKafkaProducer, batch: list, error_reason: str
 
 
 async def consume():
+    start_http_server(8000) 
+    logger.info("metrics_server_started_port_8000")
+    
     consumer = AIOKafkaConsumer(
         "raw-listens",
         bootstrap_servers=config("REDPANDA_BROKERS"),
@@ -134,6 +144,7 @@ async def consume():
                     clean_batch.append(orjson.loads(msg.value))
                 except Exception as e:
                     logger.error("parse_failed", offset=msg.offset, error=str(e))
+                    PROCESSING_ERRORS.inc() 
                     continue
             
             if not clean_batch:
@@ -149,6 +160,8 @@ async def consume():
                 
                 except Exception as e:
                     logger.error("db_insert_failed", attempt=attempt, error=str(e))
+                    PROCESSING_ERRORS.inc() 
+                    
                     if attempt < MAX_RETRIES:
                         sleep_time = INITIAL_BACKOFF * (MULTIPLIER_BACKOFF ** (attempt - 1))
                         logger.info("retrying", sleep_s=sleep_time)
@@ -156,11 +169,14 @@ async def consume():
             
             if success:
                 await consumer.commit()
+                PROCESSED_MESSAGES.inc(len(clean_batch)) 
                 logger.info("batch_flushed", count=len(clean_batch))
             else:
                 logger.error("all_retries_exhausted", action="sending_to_dlq")
-                await send_to_dlq(producer, clean_batch, error_reason="ClickHouse insert failed after retries")
                 
+                DLQ_MESSAGES.inc(len(clean_batch))
+                
+                await send_to_dlq(producer, clean_batch, error_reason="ClickHouse insert failed after retries")
                 await consumer.commit()
 
     except asyncio.CancelledError:
