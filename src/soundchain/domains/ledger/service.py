@@ -38,6 +38,10 @@ class LedgerService:
         if not transactions:
             return
 
+        treasury_id = transactions[0].debit_account_id
+        
+        Account.objects.select_for_update().filter(id=treasury_id).exists()
+        
         current_prev_hash = self._get_last_hash()
         
         postings_to_create = []
@@ -68,12 +72,16 @@ class LedgerService:
         Posting.objects.bulk_create(postings_to_create)
         
         accounts = Account.objects.filter(id__in=balance_updates.keys()).select_for_update()
-        account_map = {acc.id: acc for acc in accounts}
+        account_map = {str(acc.id): acc for acc in accounts}
         
+        accounts_to_update = []
         for acc_id, delta in balance_updates.items():
             if acc_id in account_map:
-                account_map[acc_id].balance += delta
-                account_map[acc_id].save() 
+                account = account_map[acc_id]
+                account.balance += delta
+                accounts_to_update.append(account)
+
+        Account.objects.bulk_update(accounts_to_update, ['balance'])
         
         self._last_hash_cache = current_prev_hash
         

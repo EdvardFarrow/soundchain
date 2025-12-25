@@ -1,24 +1,26 @@
-import clickhouse_connect
+import sys
+import os
 import structlog
-import json     # <--- Добавили
-import random   # <--- Добавили
+import random
+import orjson
+from datetime import timedelta, date
 from decimal import Decimal
 from decouple import config
+import clickhouse_connect
+import logging.config
 
-# --- Django Setup ---
-import os, django, sys
-sys.path.append(os.getcwd()) 
+sys.path.append(os.getcwd())
 sys.path.append(os.path.join(os.getcwd(), "src"))
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "soundchain.settings")
+
+import django
 django.setup()
 
 from soundchain.django_apps.ledger.models import Account
 from soundchain.domains.ledger.service import LedgerService, TransactionDTO
 from soundchain.utils.logging import setup_logging
 from soundchain.settings import DEBUG
-import logging.config
-
 
 logging.config.dictConfig(setup_logging(debug=DEBUG))
 logger = structlog.get_logger("payout_service")
@@ -27,10 +29,7 @@ logger = structlog.get_logger("payout_service")
 ROYALTY_RATE = Decimal("0.0030")
 PLATFORM_ACCOUNT_ID = "00000000-0000-0000-0000-000000000000"
 
-def spot_check(data, count=5):
-    """
-    Prints random items from a list for visual inspection
-    """
+def spot_check(data: list, count: int = 5):
     if not data:
         print("The data list is empty!")
         return
@@ -42,12 +41,19 @@ def spot_check(data, count=5):
 
     for i, item in enumerate(samples, 1):
         print(f"record #{i}:")
-        print(json.dumps(item, indent=4, ensure_ascii=False, default=str))
+        print(
+            orjson.dumps(
+                item, 
+                option=orjson.OPT_INDENT_2 | orjson.OPT_NAIVE_UTC
+            ).decode('utf-8')
+        )
         print("-" * 50)
     print("\n")
 
 def run_payout():
-    logger.info("payout_started")
+    yesterday = date.today() - timedelta(days=0)
+    period_str = yesterday.strftime("%Y-%m-%d")
+    logger.info("starting_daily_payout", period=period_str)
     
     try:
         ch_client = clickhouse_connect.get_client(
@@ -66,13 +72,20 @@ def run_payout():
         track_id,
         count() as streams
     FROM listens
+    WHERE toDate(timestamp) = %(period)s
     GROUP BY track_id
     HAVING streams > 0
     """
     
+    parameters = {'period': period_str}
+    
     logger.info("executing_analytics_query")
-    result = ch_client.query(query)
-    rows = result.result_rows 
+    try:
+        result = ch_client.query(query, parameters=parameters)
+        rows = result.result_rows 
+    except Exception as e:
+        logger.error("query_execution_failed", error=str(e))
+        return
     
     spot_check(rows) 
     
@@ -90,6 +103,8 @@ def run_payout():
         defaults={"name": "Spotify Platform Treasury"}
     )
 
+    transactions = []
+    
     for track_id, streams in rows:
         amount = Decimal(streams) * ROYALTY_RATE
         artist_account_id = str(track_id)
@@ -103,8 +118,8 @@ def run_payout():
             debit_account_id=PLATFORM_ACCOUNT_ID,
             credit_account_id=artist_account_id,
             amount=amount,
-            reference_id=f"payout_v1_{track_id}", 
-            description=f"Royalty for {streams} streams"
+            reference_id=f"payout_{period_str}_{track_id}",
+            description=f"Royalty for {streams} streams on {period_str}"
         )
         transactions.append(tx)
 

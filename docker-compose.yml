@@ -127,6 +127,36 @@ services:
     depends_on:
       - worker
 
+  web:
+    build: .
+    container_name: soundchain_web
+    command: python manage.py runserver 0.0.0.0:8001
+    ports:
+      - "8001:8001"  
+    volumes:
+      - .:/app  
+    environment:
+      - DJANGO_SETTINGS_MODULE=soundchain.settings
+      - REDPANDA_BROKERS=redpanda:9092
+      - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app/src
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_USER=default     
+      - CLICKHOUSE_PASSWORD=         
+      - CLICKHOUSE_DB=default
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 networks:
   default:
     name: soundchain_net

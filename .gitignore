@@ -2,15 +2,21 @@ __pycache__/
 *.py[cod]
 *$py.class
 .python-version
-
-.venv/
+*.so
 
 .env
-.env.*
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 !.env.example
 
 .vscode/
 .idea/
+*.swp
+*.swo
 
 .pytest_cache/
 .mypy_cache/
@@ -22,9 +28,14 @@ htmlcov/
 *.log
 local_settings.py
 db.sqlite3
+db.sqlite3-journal
 media/
 staticfiles/
 
 
 .docker-data/
 docker-compose.override.yml
+
+
+.DS_Store
+Thumbs.db
