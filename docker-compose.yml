@@ -57,7 +57,7 @@ services:
       - "19092:19092" # Kafka API 
       - "9644:9644"   # Admin API
     volumes:
-      - ./.docker-data/redpanda:/var/lib/redpanda/data
+      - redpanda_data:/var/lib/redpanda/data
     deploy:
       resources:
         limits:
@@ -160,3 +160,6 @@ services:
 networks:
   default:
     name: soundchain_net
+
+volumes:
+  redpanda_data:

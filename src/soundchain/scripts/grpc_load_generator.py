@@ -19,8 +19,8 @@ from soundchain.protos import ingestion_pb2, ingestion_pb2_grpc
 
 
 # Configuration
-TOTAL_REQUESTS = 50000
-CONCURRENCY = 200
+TOTAL_REQUESTS = 500000
+CONCURRENCY = 2000
 TARGET = "localhost:50051"
 
 console = Console()
