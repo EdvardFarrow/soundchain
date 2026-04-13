@@ -1,4 +1,5 @@
 import asyncio
+import os
 import random
 import time
 import uuid
@@ -89,6 +90,15 @@ async def run_load_test():
             TimeRemainingColumn(),
             console=console,
         ) as progress:
+            
+            target = os.environ.get("TARGET", "localhost:50051")
+            
+            if target.endswith(":443"):
+                credentials = grpc.ssl_channel_credentials()
+                channel = grpc.aio.secure_channel(target, credentials)
+            else:
+                channel = grpc.aio.insecure_channel(target)
+                
             main_task = progress.add_task("[cyan]Sending streams...", total=TOTAL_REQUESTS)
             
             start_time = time.time()

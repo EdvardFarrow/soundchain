@@ -1,10 +1,15 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+FROM python:3.12-slim
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
-RUN uv pip install --system .
 
-COPY . .
+RUN uv sync --frozen --no-dev
+
+COPY src/ src/
 
 ENV PYTHONPATH=/app/src
+
+CMD ["uv", "run", "python", "src/soundchain/grpc_server.py"]

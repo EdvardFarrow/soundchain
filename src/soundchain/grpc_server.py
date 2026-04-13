@@ -1,41 +1,40 @@
+import os
 import asyncio
 import grpc
 import orjson  
 import structlog
-from aiokafka import AIOKafkaProducer
 from decouple import AutoConfig
+from google.cloud import pubsub_v1
 from soundchain.protos import ingestion_pb2, ingestion_pb2_grpc
 from soundchain.utils.logging import setup_logging
 import logging.config
 
-
 config = AutoConfig(search_path=".")
-
 
 logging.config.dictConfig(setup_logging(debug=True))
 logger = structlog.get_logger("grpc_server")
 
-
 class IngestionService(ingestion_pb2_grpc.SoundChainIngestionServicer):
     def __init__(self):
-        self.producer = None
+        self.publisher = None
+        self.topic_path = None
 
     async def start(self):
-        bootstrap_servers = config("KAFKA_BOOTSTRAP_SERVERS", default="localhost:9092")
+        project_id = config("GCP_PROJECT_ID")
+        topic_id = config("PUBSUB_TOPIC_ID", default="raw-listens")
         
-        self.producer = AIOKafkaProducer(
-            bootstrap_servers=bootstrap_servers,
-            linger_ms=5,  
-            max_batch_size=32768,
-            compression_type="gzip" 
+        batch_settings = pubsub_v1.types.BatchSettings(
+            max_bytes=131072,  # 128 KB
+            max_latency=0.05,  # 50 ms
         )
-        await self.producer.start()
-        logger.info("kafka_producer_connected", servers=bootstrap_servers)
+        
+        self.publisher = pubsub_v1.PublisherClient(batch_settings=batch_settings)
+        self.topic_path = self.publisher.topic_path(project_id, topic_id)
+        
+        logger.info("pubsub_publisher_connected", topic=self.topic_path)
 
     async def stop(self):
-        if self.producer:
-            await self.producer.stop()
-            logger.info("kafka_producer_closed")
+        logger.info("pubsub_publisher_closed")
 
     async def SendListen(self, request, context):
         try:
@@ -51,7 +50,8 @@ class IngestionService(ingestion_pb2_grpc.SoundChainIngestionServicer):
             
             value_bytes = orjson.dumps(payload)
 
-            await self.producer.send("raw-listens", value_bytes)
+            future = self.publisher.publish(self.topic_path, value_bytes)
+            await asyncio.wrap_future(future)
             
             return ingestion_pb2.ListenResponse(success=True, message="OK")
         
@@ -64,7 +64,10 @@ async def serve():
     service_impl = IngestionService()
     
     ingestion_pb2_grpc.add_SoundChainIngestionServicer_to_server(service_impl, server)
-    listen_addr = "[::]:50051"
+    
+    port = os.environ.get("PORT", "50051")
+    listen_addr = f"[::]:{port}"
+    
     server.add_insecure_port(listen_addr)
 
     await service_impl.start()  
